@@ -12,10 +12,12 @@ int main(void) {
   if((buf = getenv("QUERY_STRING")) != NULL) {
     p = strchr(buf, '&');
     *p = '\0';
-    strcpy(arg1, buf);
-    strcpy(arg2, p+1);
-    n1 = atoi(arg1);
-    n2 = atoi(arg2);
+    sscanf(buf, "First=%d", &n1);
+    sscanf(p+1, "Second=%d", &n2);
+    // strcpy(arg1, buf);
+    // strcpy(arg2, p+1);
+    // n1 = atoi(arg1);
+    // n2 = atoi(arg2);
   }
   
   // 응답 본체

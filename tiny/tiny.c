@@ -1,11 +1,5 @@
-/* $begin tinymain */
-/*
- * tiny.c - A simple, iterative HTTP/1.0 Web server that uses the
- *     GET method to serve static and dynamic content.
- *
- * Updated 11/2019 droh
- *   - Fixed sprintf() aliasing issue in serve_static(), and clienterror().
- */
+
+
 #include "csapp.h"
 
 void doit(int fd);
@@ -56,9 +50,9 @@ void doit(int fd){
     printf("Request headers:\n");
     printf("%s", buf);
     sscanf(buf, "%s %s %s", method, uri, version);
-    if(strcasecmp(method, "GET")) {
-    	clienterror(fd, method, "501","Not implemented",
-    			"Tiny does not implement this method");
+
+    if(strcasecmp(method, "GET") && strcasecmp(method, "HEAD")) {
+    	clienterror(fd, method, "501","Not implemented","Tiny does not implement this method");
     	return;
     }
     read_requesthdrs(&rio);
@@ -78,8 +72,7 @@ void doit(int fd){
     //만약 정적이라면 
     	// 보통 파일인지/읽기권한이 있는지 확인 후 맞다면 서비스함.
     if(is_static){
-    	if(!(S_ISREG(sbuf.st_mode)) || 
-        		!(S_IRUSR & sbuf.st_mode)){
+    	if(!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)){
     		clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
     		return;
     	}
@@ -87,8 +80,7 @@ void doit(int fd){
     }
     // 동적이라면 보통 파일인지/실행 가능한지 확인 후 맞다면 서비스함.
     else{
-    	if(!(S_ISREG(sbuf.st_mode)) || 
-        		!(S_IXUSR & sbuf.st_mode)){
+    	if(!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)){
     		clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
     		return;
     		}
@@ -100,7 +92,7 @@ void read_requesthdrs(rio_t *rp){
   char buf[MAXLINE];
     //첫번째 줄은 요청 라인이라 먼저 읽음.
     Rio_readlineb(rp, buf, MAXLINE);
-    
+
     //요청 헤더를, \r\n이 나올때까지 계속 읽음.
     while(strcmp(buf, "\r\n")){
     	Rio_readlineb(rp, buf, MAXLINE);
@@ -110,32 +102,33 @@ void read_requesthdrs(rio_t *rp){
 }
 
 int parse_uri(char *uri, char *filename, char *cgiargs){
-char *ptr;
 
-	//만약 요청이 정적 컨텐츠라면 
-    if(!strstr(uri,"cgi-bin")){
-    	strcpy(cgiargs, "");
-        strcpy(filename, ".");
-        strcat(filename, uri);
-        if(uri[strlen(uri)-1] == '/')
-        	strcat(filename, "home.html");
-        return 1;
-    }
-    
-    //만약 요청이 동적 컨텐츠라면
-    else{
-    	ptr = index(uri, '?');
-    	if(ptr){
-        	strcpy(cgiargs, ptr+1);
-            *ptr = '\0';
-        }
-        else{
-        	strcpy(cgiargs,"");
-        }
-        strcpy(filename,".");
-        strcat(filename, uri);
-        return 0;
-    }
+  char *ptr;
+
+  //만약 요청이 정적 컨텐츠라면 
+  if(!strstr(uri,"cgi-bin")){
+    strcpy(cgiargs, "");
+      strcpy(filename, ".");
+      strcat(filename, uri);
+      if(uri[strlen(uri)-1] == '/')
+        strcat(filename, "home.html");
+      return 1;
+  }
+  
+  //만약 요청이 동적 컨텐츠라면
+  else{
+    ptr = index(uri, '?');
+    if(ptr){
+        strcpy(cgiargs, ptr+1);
+          *ptr = '\0';
+      }
+      else{
+        strcpy(cgiargs,"");
+      }
+      strcpy(filename,".");
+      strcat(filename, uri);
+      return 0;
+  }
 }
 
 
@@ -167,6 +160,13 @@ void serve_static(int fd, char *filename, int filesize){
     Rio_writen(fd,srcp, filesize);
     Munmap(srcp, filesize);
 
+    // srcp = (char*)Malloc(filesize);
+    // Rio_readn(srcfd, srcp, filesize);
+    // Close(srcfd);
+    // Rio_writen(fd, srcp, filesize);
+    // Free(srcp);
+
+
 }
 void get_filetype(char *filename, char *filetype){
 
@@ -178,6 +178,8 @@ void get_filetype(char *filename, char *filetype){
     	strcpy(filetype, "image/png");
     else if (strstr(filename, ".jpg"))
     	strcpy(filetype, "image/jpeg");
+    else if (strstr(filename, ".mpeg"))
+      strcpy(filetype, "video/mpeg");
     else
     	strcpy(filetype, "text/plain");
 }
