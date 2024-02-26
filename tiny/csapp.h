@@ -29,37 +29,44 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+//기본 파일 권한 명시를 정의.
+// DEF_UMASK는 그 중 그룹과 기타 사용자에 대한 쓰기 권한만 제한하기 위해 따로 편의성으로 빼놓음.
 /* Default file permissions are DEF_MODE & ~DEF_UMASK */
 /* $begin createmasks */
 #define DEF_MODE   S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
 #define DEF_UMASK  S_IWGRP|S_IWOTH
 /* $end createmasks */
 
+
+// sockaddr 구조체를 쉽게 명시하기 위한 정의.
 /* Simplifies calls to bind(), connect(), and accept() */
 /* $begin sockaddrdef */
 typedef struct sockaddr SA;
 /* $end sockaddrdef */
 
+// 안정성을 위해 따로 설정. 
 /* Persistent state for the robust I/O (Rio) package */
 /* $begin rio_t */
 #define RIO_BUFSIZE 8192
 typedef struct {
-    int rio_fd;                /* Descriptor for this internal buf */
-    int rio_cnt;               /* Unread bytes in internal buf */
-    char *rio_bufptr;          /* Next unread byte in internal buf */
-    char rio_buf[RIO_BUFSIZE]; /* Internal buffer */
+    int rio_fd;                /* Descriptor for this internal buf */// 즉 어떤 fd와 관련이 있는지 명시.
+    int rio_cnt;               /* Unread bytes in internal buf */ // 버퍼에 남은 아직 안 읽은 바이트수.
+    char *rio_bufptr;          /* Next unread byte in internal buf */ // 버퍼에서 다음에 읽어들일 데이터 시작위치, 바이트의 포인터.
+    char rio_buf[RIO_BUFSIZE]; /* Internal buffer */ // 데이터를 저장하는 내부버퍼. 
 } rio_t;
 /* $end rio_t */
 
+//외부 변수. 다른 소스파일에서 정의되었으며, 참조만 가능한 값.
 /* External variables */
 extern int h_errno;    /* Defined by BIND for DNS errors */ 
-extern char **environ; /* Defined by libc */
+extern char **environ; /* Defined by libc */ // 프로세스 환경병수 가리킴. C라이브러리에 저장되어있음.
 
 /* Misc constants */
 #define	MAXLINE	 8192  /* Max text line length */
 #define MAXBUF   8192  /* Max I/O buffer size */
 #define LISTENQ  1024  /* Second argument to listen() */
 
+// 에러 핸들러.
 /* Our own error-handling functions */
 void unix_error(char *msg);
 void posix_error(int code, char *msg);
@@ -67,18 +74,21 @@ void dns_error(char *msg);
 void gai_error(int code, char *msg);
 void app_error(char *msg);
 
+
+
 /* Process control wrappers */
 pid_t Fork(void);
 void Execve(const char *filename, char *const argv[], char *const envp[]);
-pid_t Wait(int *status);
-pid_t Waitpid(pid_t pid, int *iptr, int options);
+pid_t Wait(int *status); // 부모 프로세스가 자식 프로세스 종료시 사용. status는 자식 프로세스 상태를 가리키는 포인터.
+pid_t Waitpid(pid_t pid, int *iptr, int options); //특정 PID 자식 프로세스가 종료될때까지 대기. options는 대기 동작을 조절하는 옵션 플래그.
 void Kill(pid_t pid, int signum);
-unsigned int Sleep(unsigned int secs);
-void Pause(void);
+unsigned int Sleep(unsigned int secs); // 주어진 초 동안 지연 시킴.
+void Pause(void); // 당장 일단 멈춤.
 unsigned int Alarm(unsigned int seconds);
 void Setpgid(pid_t pid, pid_t pgid);
 pid_t Getpgrp();
 
+// 시그널 래퍼 함수. 
 /* Signal wrappers */
 typedef void handler_t(int);
 handler_t *Signal(int signum, handler_t *handler);
