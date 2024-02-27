@@ -5,9 +5,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char *method);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -51,7 +51,7 @@ void doit(int fd){
     printf("%s", buf);
     sscanf(buf, "%s %s %s", method, uri, version);
 
-    if(strcasecmp(method, "GET") && strcasecmp(method, "HEAD")) {
+    if(!(strcasecmp(method, "GET") == 0 || strcasecmp(method, "HEAD") == 0)) {
     	clienterror(fd, method, "501","Not implemented","Tiny does not implement this method");
     	return;
     }
@@ -76,7 +76,7 @@ void doit(int fd){
     		clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
     		return;
     	}
-    	serve_static(fd, filename, sbuf.st_size);
+    	serve_static(fd, filename, sbuf.st_size, method);
     }
     // 동적이라면 보통 파일인지/실행 가능한지 확인 후 맞다면 서비스함.
     else{
@@ -84,7 +84,7 @@ void doit(int fd){
     		clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
     		return;
     		}
-    	serve_dynamic(fd,filename, cgiargs);
+    	serve_dynamic(fd,filename, cgiargs, method);
 }
 
 }
@@ -132,39 +132,42 @@ int parse_uri(char *uri, char *filename, char *cgiargs){
 }
 
 
-void serve_static(int fd, char *filename, int filesize){
+void serve_static(int fd, char *filename, int filesize, char *method){
 
   int srcfd;
-    char *srcp, filetype[MAXLINE], buf[MAXBUF];
-    
-    // 파일 타입 결정.
-    get_filetype(filename, filetype);
-    
-    //응답 라인, 헤더 송신.(HTTP 줄이 라인.)
-    //(서버에도 같은내용 출력.)
-    sprintf(buf, "HTTP/1.0 200 OK\r\n");
-    sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-    sprintf(buf, "%sConnection : close\r\n", buf);
-    sprintf(buf,"%sContent-length: %d\r\n", buf, filesize);
-    sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
-    Rio_writen(fd, buf, strlen(buf));
-    printf("Response headers:\n");
-    printf("%s", buf);
-    
-    
-    // 요청한 정적 컨텐츠를 찾아서 
-    // 가상메모리에 씀 -> 옮겨적음(송신) -> 둘다 닫음.
-    srcfd = Open(filename, O_RDONLY, 0);
-    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-    Close(srcfd);
-    Rio_writen(fd,srcp, filesize);
-    Munmap(srcp, filesize);
+  char *srcp, filetype[MAXLINE], buf[MAXBUF];
+  
+  // 파일 타입 결정.
+  get_filetype(filename, filetype);
+  
+  //응답 라인, 헤더 송신.(HTTP 줄이 라인.)
+  //(서버에도 같은내용 출력.)
+  sprintf(buf, "HTTP/1.0 200 OK\r\n");
+  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sConnection : close\r\n", buf);
+  sprintf(buf,"%sContent-length: %d\r\n", buf, filesize);
+  sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
+  Rio_writen(fd, buf, strlen(buf));
+  printf("Response headers:\n");
+  printf("%s", buf);
+  
+  if(strcasecmp(method, "HEAD") == 0)
+    return;
 
-    // srcp = (char*)Malloc(filesize);
-    // Rio_readn(srcfd, srcp, filesize);
-    // Close(srcfd);
-    // Rio_writen(fd, srcp, filesize);
-    // Free(srcp);
+  // 요청한 정적 컨텐츠를 찾아서 
+  // 가상메모리에 씀 -> 옮겨적음(송신) -> 둘다 닫음.
+  srcfd = Open(filename, O_RDONLY, 0);
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  Close(srcfd);
+  Rio_writen(fd,srcp, filesize);
+  Munmap(srcp, filesize);
+
+  // srcp = (char*)Malloc(filesize);
+  // Rio_readn(srcfd, srcp, filesize);
+  // Close(srcfd);
+  // Rio_writen(fd, srcp, filesize);
+  // Free(srcp);
+
 
 
 }
@@ -183,7 +186,7 @@ void get_filetype(char *filename, char *filetype){
     else
     	strcpy(filetype, "text/plain");
 }
-void serve_dynamic(int fd, char *filename, char *cgiargs){
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method){
 
   char buf[MAXLINE], *emptylist[] = { NULL };
     
@@ -195,12 +198,14 @@ void serve_dynamic(int fd, char *filename, char *cgiargs){
     
     //자식 프로세스에서 CGI 프로그램 실행.
     if(Fork() == 0){
-    	setenv("QUERY_STRING", cgiargs, 1); //환경변수 설정.
+      setenv("QUERY_STRING", cgiargs, 1); //환경변수 설정.
+      setenv("REQUEST_METHOD", method, 1);
       Dup2(fd, STDOUT_FILENO); // 자식 프로세스의 표준 출력을 클라이언트에게 보낼 fd로 재지정.
       Execve(filename, emptylist, environ); // 자식 프로세스를 새로운 프로그램으로 교체.
         // CGI 파일 경로, 명령 라인 인수 배열, 환경 변수 리스트.
       }
     Wait(NULL);
+
 }
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg){
 
