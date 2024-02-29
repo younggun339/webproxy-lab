@@ -40,7 +40,7 @@ int main(int argc, char** argv)
         printf("id: %s\n", id);
         serv_addr.sin_family=AF_INET;
         serv_addr.sin_addr.s_addr=inet_addr("13.209.43.128");
-        serv_addr.sin_port=htons(7889);
+        serv_addr.sin_port=htons(54321);
 if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))== -1)
         {
                 printf("connect error\n");
@@ -52,10 +52,9 @@ if(connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr))== -1)
         {
                 fgets(msg, sizeof(msg), stdin);
                 //fputs(msg,stdout));
-                sprintf(chat, sizeof(chat), "[%s]: %s", id, msg);
+                sprintf(chat, "[%s]: %s", id, msg);
                 //printf("보냈음! [%s]: %s", id, msg);
                 write(sock,chat,strlen(chat) + 1);
-                sleep(1);
         }
         close(sock);
         return 0;

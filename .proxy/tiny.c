@@ -144,7 +144,7 @@ void serve_static(int fd, char *filename, int filesize, char *method){
   //(서버에도 같은내용 출력.)
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-  sprintf(buf, "%sConnection: close\r\n", buf);
+  sprintf(buf, "%sConnection : close\r\n", buf);
   sprintf(buf,"%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
   Rio_writen(fd, buf, strlen(buf));

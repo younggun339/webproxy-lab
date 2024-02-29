@@ -16,7 +16,6 @@ void Send(int fd);
 void read_requesthdrs(rio_t *rp, int fd, char *hostname);
 void parse_uri(char *uri, char *hostname, char *port, char *path);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
-// void *thread(void *vargp);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -30,7 +29,6 @@ int main(int argc, char **argv) {
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
-//   pthread_t tid;
 
   /* Check command line args */
   if (argc != 2) {
@@ -48,20 +46,9 @@ int main(int argc, char **argv) {
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     Send(connfd);   // line:netp:tiny:doit
     Close(connfd);  // line:netp:tiny:close
-    // Pthread_create(&tid, NULL, thread, connfdp); 
   }
   return 0;
 }
-
-// void *thread(void *vargp)
-//     {
-//       int connfd = *((int *)vargp);
-//       Pthread_detach(pthread_self());
-//       Free(vargp);
-//       Send(connfd);
-//       Close(connfd);
-//       return NULL;
-//     }
 
 void Send(int fd){
 
@@ -115,9 +102,7 @@ void Send(int fd){
 void receive_pass(int clientfd, int serverfd, rio_t *rio_ser){
 
   char buf[MAXLINE];
-  int size = -1;
-  size_t n;
-  char tmp_str[MAXBUF];
+  int Content_length_val;
   // 첫번째 줄 응답 라인
   Rio_readlineb(rio_ser, buf, MAXLINE);
   Rio_writen(clientfd, buf, strlen(buf));
@@ -125,23 +110,25 @@ void receive_pass(int clientfd, int serverfd, rio_t *rio_ser){
   //응답 헤더 보내야지
   while(strcmp(buf, "\r\n") != 0){
     Rio_readlineb(rio_ser, buf, MAXLINE);
-    if(strstr(buf, "Content-Length:")){
-      sscanf(buf, "Content-Length: %d", &size);
+    if(strstr(buf, "Content-length:")){
+      sscanf(buf, "Content-length: %d", &Content_length_val);
     }
     Rio_writen(clientfd, buf, strlen(buf));
   }
- 
+
   // 응답 본문 보내야지
-  while ((n = Rio_readnb(rio_ser, tmp_str, MAX_CACHE_SIZE)) != 0){
-    printf("proxy received %lu bytes,then send\n",n);
-    Rio_writen(clientfd, tmp_str, n);
-  };
+  char *bodyp;
+
+  bodyp = (char*)Malloc(Content_length_val);
+  Rio_readn(serverfd, bodyp, Content_length_val);
+  Rio_writen(clientfd, bodyp, Content_length_val);
+  Free(bodyp);
 
 }
 
 void read_requesthdrs(rio_t *rp, int fd, char *hostname){
   char buf[MAXLINE];
-  int User_flag = 0, Connect_flag = 0, Procon_flag = 0, Host_flag = 0;
+  int User_flag, Connect_flag, Procon_flag, Host_flag = 0;
  // 첫번째 줄은 요청 라인이라 먼저 읽음.
     Rio_readlineb(rp, buf, MAXLINE);
 
@@ -216,9 +203,7 @@ void parse_uri(char *uri, char *hostname, char *port, char *path){
   if (port_ptr) // port 있는 경우
   {
     strncpy(port, port_ptr + 1, path_ptr - port_ptr - 1); 
-    port[MAXLINE - 1] = '\0';
     strncpy(hostname, hostname_ptr, port_ptr - hostname_ptr);
-    hostname[MAXLINE - 1] = '\0';
   }
   else // port 없는 경우
   {
@@ -237,7 +222,7 @@ char buf[MAXLINE], body[MAXBUF];
     //응답 본체 설계.
     sprintf(body, "<html><title>Tiny Error</title>");
     sprintf(body,"%s<body bgcolor=\"ffffff\">\r\n", body);
-    sprintf(body,"%s%s: %s\r\n", body, errnum, shortmsg);
+    sprintf(body,"%s%s: $s\r\n", body, errnum, shortmsg);
     sprintf(body,"%s<p>%s: %s\r\n", body, longmsg, cause);
     sprintf(body,"%s<hr><em> The Tiny Web server</em>\r\n", body);
     
